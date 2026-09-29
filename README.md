@@ -33,9 +33,49 @@
 
 여섯 축은 이 문서의 점검 분류입니다. 특정 영상의 분류를 그대로 재현했다거나 업계의 고정된 여섯 종류 표준이라는 뜻은 아닙니다.
 
-전문가 사례는 운영 지침 11절에 정리돼 있습니다. Karpathy의 실험·평가 분리, Simon Willison의 테스트와 실제 사용 확인, Anthropic의 장기 작업 상태 관리와 단순한 도구 설계, Boris Cherny의 검증 환경 및 지침 재평가 등을 문서의 적용안과 구분해 수록했습니다. 원문 링크와 확인 시점은 해당 문서에 있습니다. 이 README에서는 출처를 새로 검증하거나 최신 동향을 다시 조사하지 않았습니다.
+전문가 사례는 운영 지침 11절에 정리돼 있습니다. Karpathy의 실험·평가 분리, Simon Willison의 테스트와 실제 사용 확인, Anthropic의 장기 작업 상태 관리와 단순한 도구 설계, Boris Cherny의 검증 환경 및 지침 재평가 등을 문서의 적용안과 구분해 수록했습니다. 아래 참고 자료 목록에서 원문과 반영 위치를 함께 확인할 수 있습니다.
 
 어떤 모델로 작성했는지, 유명 전문가를 몇 명 인용했는지만으로 품질을 판정하지 않습니다. 저장소에는 실제 모델 호출 기록이나 프로젝트별 성능 비교 결과가 포함돼 있지 않습니다.
+
+## 만들 때 참고한 자료
+
+아래 목록은 **메일 첨부 원본에 기록된 출처**를 모아 정리한 것입니다. 자료마다 이 하네스에 반영한 내용과 확인할 문서 위치를 함께 표시했습니다. 원문의 주장과 사용자 요구에 맞춰 추가한 운영 규칙은 구분합니다.
+
+### 출발점과 사용자 요구
+
+| 자료 | 반영한 내용 | 반영 위치 |
+| --- | --- | --- |
+| [사용자가 제공한 ChatGPT 공유 대화](https://chatgpt.com/share/6aaaa4b7-2ee0-83ee-acd4-f257dcb7ad0c) | 초기 토큰 효율 가이드의 바탕. 불필요한 맥락·도구 호출·출력을 줄이는 원칙 | [초기 토큰 효율 가이드](archive/01-token-efficiency/AI_Coding_Agent_Token_Efficiency_Guide.md), 운영 지침 10절 |
+| [실밸개발자의 하네스 설명 영상 — 12:23부터](https://www.youtube.com/watch?v=6IbdH5jMP00&t=743s) | 하네스의 구성 요소를 점검하는 출발점. 구조·맥락·계획·실행·검증·개선은 이 문서의 실무 분류로 구성 | 운영 지침 3절 및 참고 목록 |
+| 이 문서를 만든 대화의 후속 요청과 수정 피드백 | 거친 요청의 맥락 해석, 빠진 정보 요청, 중요한 누락만 질문, 최종본 통합, 실패 기반 개선, 실제 검증 연결 | 운영 지침 2~4·8~9·13절, 적용 가이드 4~5·8~9절 |
+
+공유 대화와 사용자 피드백은 요구사항의 출처입니다. 전문가의 독립적인 연구 결과나 성능 검증 자료로 취급하지 않습니다.
+
+### 전문가의 공개 실무 자료
+
+| 작성자·자료 | 이 하네스에 반영한 내용 | 반영 위치 |
+| --- | --- | --- |
+| Andrej Karpathy — [autoresearch](https://github.com/karpathy/autoresearch) | 변경 범위와 평가 기준 분리, 같은 조건의 실험 비교, 개선 여부를 근거로 변경 유지 | 운영 지침 11.1절, 적용 가이드 6절 |
+| Simon Willison — [First run the tests](https://simonwillison.net/guides/agentic-engineering-patterns/first-run-the-tests/) | 기존 테스트로 기준 상태와 검증 방법 확인, 기존 실패와 새 실패 구분 | 운영 지침 11.2절 |
+| Simon Willison — [Red/green TDD](https://simonwillison.net/guides/agentic-engineering-patterns/red-green-tdd/) | 재현 테스트가 먼저 실패하는지 확인하고 수정 후 같은 검사로 통과 확인 | 운영 지침 11.2절 |
+| Simon Willison — [Agentic manual testing](https://simonwillison.net/guides/agentic-engineering-patterns/agentic-manual-testing/) | 자동 테스트에 더해 화면·서버·API 등 실제 사용 경로 확인 | 운영 지침 11.3절, 적용 가이드 8절 |
+| Justin Young / Anthropic — [Effective harnesses for long-running agents](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents) | 기능별 완료 기준, 진행 기록과 Git 이력, 다음 세션의 재개, 구현과 검증 상태 구분 | 운영 지침 11.4절, 적용 가이드 8.3절 |
+| Erik S.·Barry Zhang / Anthropic — [Building effective agents](https://www.anthropic.com/engineering/building-effective-agents) | 단순한 구성에서 시작, 명확한 도구 입력·오류·예시, 실행 결과 관찰과 중단 조건 | 운영 지침 11.5절 |
+| Prithvi Rajasekaran / Anthropic — [Harness design for long-running application development](https://www.anthropic.com/engineering/harness-design-long-running-apps) | 주관적인 품질 기준 구체화, 생성과 평가 구분, 하네스 요소를 하나씩 바꿔 효과 비교 | 운영 지침 11.6·13절 |
+| Boris Cherny / Y Combinator 인터뷰 — [하네스 재평가 3:30~9:23](https://www.youtube.com/watch?v=qyPCVqFUyDo&t=210s), [검증 환경 20:40~24:27](https://www.youtube.com/watch?v=qyPCVqFUyDo&t=1240s) | 결과를 직접 확인할 도구 연결, 모델 변경 후 불필요한 지침 재평가, 반복 실패에 맞춘 보완 | 운영 지침 11.7·13절, 적용 가이드 6·8절 |
+
+각 항목의 상세한 원문 요지와 이 문서의 적용안은 [운영 지침](AGENT_HARNESS_GUIDE.md) 11절에 있습니다. 예를 들어 질문 기준, 일반 업무용 중단 조건, 영향에 맞춘 테스트 범위는 원문을 그대로 옮긴 문장이 아니라 이 하네스의 적용상 조정입니다.
+
+### 도구 설정에 참고한 공식 문서
+
+| 공식 자료 | 참고한 범위 | 반영 위치 |
+| --- | --- | --- |
+| OpenAI — [AGENTS.md 구성](https://learn.chatgpt.com/docs/agent-configuration/agents-md) | 에이전트 시작 지침의 위치와 구성, 상세 가이드 연결 | 운영 지침 1절, 적용 가이드 3~4절 |
+| OpenAI — [모델 사용 가이드](https://developers.openai.com/api/docs/guides/latest-model) | 의도 파악·작업 완수·결과 검증에 관한 지침 | 운영 지침 2~7절 및 참고 목록 |
+| Anthropic — [Claude Code 지침과 메모리](https://code.claude.com/docs/en/memory) | CLAUDE.md와 규칙 파일, 공통 지침을 연결하는 배치 방식 | 적용 가이드 3·5절 |
+| Anthropic — [Claude Code hooks](https://code.claude.com/docs/en/hooks) | 반복 검사를 도구 이벤트와 연결하는 방법 | 적용 가이드 8절 |
+
+첨부 원본에 기록된 확인 시점은 전문가 자료 **2026-09-16~17**, 제품 설정 문서 **2026-09-17**입니다. 이번 README 갱신은 기존 출처를 모아 반영 위치를 정리한 작업이며, 원문 내용이나 링크의 현재 유효성을 다시 검증한 작업은 아닙니다. 특히 `latest-model`과 제품 문서는 내용이 바뀔 수 있으므로 실제 적용 시 현재 공식 문서와 대조해야 합니다.
 
 ## 설계 의도
 
