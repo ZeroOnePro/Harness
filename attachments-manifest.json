@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "attachment_count": 9,
+  "files": [
+    {
+      "path": "HARNESS_SETUP_GUIDE.md",
+      "bytes": 20683,
+      "sha256": "412d5a32d2bb5fd6fa1b3c0687a0692dcd9212837807f2724fb7c7a260dfe593"
+    },
+    {
+      "path": "AGENT_HARNESS_GUIDE.md",
+      "bytes": 37063,
+      "sha256": "0ec60acbb0ac92dec1acee20b5f7c724564a65b2bbbeb6e04e5698af60f15f17"
+    },
+    {
+      "path": "archive/03-superseded-final/HARNESS_SETUP_GUIDE_FINAL.md",
+      "bytes": 15386,
+      "sha256": "a290bd8a78db24bd2f94abe2c3771f6613db18b0842b02203a6d3c08ba268c64"
+    },
+    {
+      "path": "archive/03-superseded-final/AGENT_HARNESS_GUIDE_FINAL.md",
+      "bytes": 30961,
+      "sha256": "d7bd51165f7fa6e5b757e3712bc0ce43e93d6836861156278144faf19e1a7407"
+    },
+    {
+      "path": "archive/02-harness-experts/HARNESS_SETUP_GUIDE.md",
+      "bytes": 13519,
+      "sha256": "3ca78be670d327d5a613b228c8edbda04fa020793b7afb79c1091e8bc7054611"
+    },
+    {
+      "path": "archive/02-harness-experts/AGENT_HARNESS_GUIDE.md",
+      "bytes": 28477,
+      "sha256": "f003bf5795bfd2219dfed4d1332fe24427f0153d44a2b7d329e4556b82b0cf54"
+    },
+    {
+      "path": "archive/01-token-efficiency/AI_Coding_Agent_Token_Efficiency_Guide.md",
+      "bytes": 10119,
+      "sha256": "5ff3ce6ccb68958b6f1b55d997ae0cb0439db4ef50855c234c11f7061cb74106"
+    },
+    {
+      "path": "archive/01-token-efficiency/CLAUDE.md",
+      "bytes": 2332,
+      "sha256": "77311d44a4fdd27cfb832b62e92556a82ecfb85afffd5f87f033a277e0046d11"
+    },
+    {
+      "path": "archive/01-token-efficiency/AGENTS.md",
+      "bytes": 2472,
+      "sha256": "cbe4eacf0c190cafdb9c7cdab958d115eccdf1622b3d426de30d0aa740ba063c"
+    }
+  ]
+}
