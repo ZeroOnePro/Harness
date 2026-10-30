@@ -1,0 +1,4 @@
+interface:
+  display_name: "하네스 단순화 검토"
+  short_description: "동작과 필수 제약을 보존하면서 중복과 불필요한 추상화를 줄입니다"
+  default_prompt: "$harness-simplify로 변경 범위의 중복과 불필요한 추상화를 점검하고 정리해줘."

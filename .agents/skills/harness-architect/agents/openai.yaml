@@ -1,0 +1,4 @@
+interface:
+  display_name: "하네스 설계 검토"
+  short_description: "변경 영향과 컴포넌트 책임을 확인하고 설계 대안을 비교합니다"
+  default_prompt: "$harness-architect로 현재 구조와 변경 영향을 확인하고 설계 대안을 비교해줘."
