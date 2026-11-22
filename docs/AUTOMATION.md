@@ -1,7 +1,7 @@
 # 일일 하네스 자동화: 중앙 관리와 비공개 프로젝트 연동
 
 - 중앙 저장소: `ZeroOnePro/Harness` (공개).
-- 적용 대상: `ZeroOnePro/fifa16`, `ZeroOnePro/NutriPilot`, `ZeroOnePro/BudgeBook`, `ZeroOnePro/AI-Agent-Study` (모두 비공개).
+- 적용 대상: 현재 연결된 비공개 개인 프로젝트 4개. 비공개 저장소 이름과 세부 실패 기록은 이 공개 문서에 기록하지 않는다.
 - 대상 프로젝트의 `.github/workflows/daily-harness.yml`은 중앙의 재사용 워크플로를 `@main`으로 호출한다.
 - 각 프로젝트는 `.harness/COMMON_RULES.md`를 중앙 `shared/COMMON_RULES.md`에서 동기화한다. 프로젝트별 `AGENTS.md`가 그 파일을 참조한다.
 - 매일 00:00 UTC = 한국시간 09:00 실행. GitHub schedule은 부하에 따라 늦어지거나 건너뛸 수 있다. 수동 실행은 workflow_dispatch로 가능하다.
@@ -19,3 +19,11 @@
 비공개 `harness-failures.json`에 반복 실패의 fingerprint·유형·run 링크가 쌓인다. 반복된 유형을 실제 재현 테스트로 바꾼 뒤 **민감 정보가 없는 일반화된** eval 사례만 이 공개 저장소에 PR로 추가한다. 원본 로그를 공개 저장소의 이슈나 PR에 첨부하지 않는다.
 
 향후 완전 자동 교차 저장소 집계를 원한다면 중앙 Harness의 비공개 전환 또는 별도 비공개 평가 저장소와 GitHub App의 최소권한 인증을 먼저 구성해야 한다. 공개 저장소로의 무단 로그 복제는 금지한다.
+
+## 중앙 원인 분류 자동 실행 (선택적 비밀 저장소 연동)
+
+중앙 GitHub Actions에 **Repository secrets** `HARNESS_SOURCE_READ_TOKEN`(대상 저장소에 Actions: read만 허용하는 fine-grained token), `HARNESS_PRIVATE_SOURCES`(해당 비공개 저장소 full name의 쉼표 구분 문자열)을 설정하면 중앙의 `scripts/central_triage.py`가 매일 최근 14일의 실패 워크플로 *단계 이름*만 분석한다. 토큰이 없으면 안전하게 건너뛴다. 인증정보·에러 전문·로그를 출력하거나 아티팩트에 보존하지 않는다.
+
+반복 실패 유형만 비식별 일반 개선 가설로 생성하고, 원본 지침을 자동 변경하지 않고 **검토용 PR**로 제안한다. PR 자동 생성에는 GitHub Actions의 `contents: write`, `pull-requests: write` 및 저장소의 Actions PR 생성 허용이 필요할 수 있다.
+
+이 기능은 외부 LLM을 호출하지 않는다. 실패 유형 분류는 휴리스틱이며 실제 테스트 기반 에이전트 품질 개선은 미검증 상태다. 사용자가 직접 인증정보를 이 공개 저장소의 파일이나 이슈에 입력하지 않도록 한다.
