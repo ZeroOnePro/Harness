@@ -93,6 +93,34 @@ def main():
         except (urllib.error.URLError, KeyError, ValueError, TimeoutError) as exc:
             report["status"] = "unavailable"
             report["limitations"].append("GitHub API failure: " + type(exc).__name__)
+    # Optional evidence captured during local agent work stays in this PRIVATE project.
+    local_cases = Path(".harness/failure-cases.jsonl")
+    if local_cases.is_file():
+        for line_number, line in enumerate(local_cases.read_text(encoding="utf-8").splitlines(), 1):
+            if not line.strip():
+                continue
+            try:
+                sample = json.loads(line)
+                if not isinstance(sample, dict) or not isinstance(sample.get("category"), str):
+                    raise ValueError("category missing")
+                kind = sample["category"]
+                report["cases"].append({
+                    "id": hashlib.sha256((args.repo + "|" + str(line_number) + "|" + line).encode()).hexdigest()[:16],
+                    "category": kind, "source": "local_agent_failure", "status": "candidate_needs_reproduction",
+                    "observed": sample.get("observed", ""), "expected": sample.get("expected", ""),
+                    "regression": sample.get("regression", ""), "date": sample.get("date", ""),
+                })
+            except (ValueError, TypeError):
+                report["limitations"].append(f"invalid local failure record line {line_number}")
+    report["counts"] = dict(Counter(c["category"] for c in report["cases"]))
+    repeats = [kind for kind, count in report["counts"].items() if count >= 2]
+    report["improvement_candidates"] = [
+        {"category": kind, "count": report["counts"][kind],
+         "action": recommendation(kind) if kind in ("test_regression", "build_failure", "dependency_environment",
+                                                    "security_permission", "deployment", "unclassified")
+                   else "최초 실패 지점과 정상 사례를 같은 조건으로 재현하고 최소 하네스 변경 후보를 평가"}
+        for kind in repeats
+    ]
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print("Harness failure collection:", report["status"], report["counts"], report["limitations"])
     summary = Path(os.getenv("GITHUB_STEP_SUMMARY", ""))
