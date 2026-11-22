@@ -1,0 +1,37 @@
+name: Reusable project harness audit
+on:
+  workflow_call:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout calling project
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout central Harness implementation
+        uses: actions/checkout@v4
+        with:
+          repository: ZeroOnePro/Harness
+          ref: main
+          path: .harness-source
+          persist-credentials: false
+      - name: Validate project harness instructions
+        run: python3 .harness-source/scripts/validate_harness.py --mode project --output harness-validation.json
+      - name: Collect failed Actions step metadata in this private repo
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .harness-source/scripts/harvest_failures.py --output harness-failures.json
+      - name: Keep detailed evidence inside calling repository
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-harness-feedback
+          path: |
+            harness-validation.json
+            harness-failures.json
+          retention-days: 30
+          if-no-files-found: warn
