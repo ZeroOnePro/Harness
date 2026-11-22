@@ -13,6 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Compile automation scripts and parse example evaluation cases
+        run: |
+          python3 -m py_compile scripts/*.py
+          python3 -c "import json; d=json.load(open('evals/cases/observed_patterns.json', encoding='utf-8')); assert d['status']=='design_only_not_executed' and len(d['cases']) >= 3"
       - name: Validate nine archived originals, links and skill metadata
         run: python3 scripts/validate_harness.py --mode central --output harness-validation.json
       - name: Store central validation result
