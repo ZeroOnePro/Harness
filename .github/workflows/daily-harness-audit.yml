@@ -1,0 +1,25 @@
+name: Daily central harness audit
+on:
+  schedule:
+    - cron: "0 0 * * *" # 09:00 Asia/Seoul (UTC+9)
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate nine archived originals, links and skill metadata
+        run: python3 scripts/validate_harness.py --mode central --output harness-validation.json
+      - name: Store central validation result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: central-harness-validation
+          path: harness-validation.json
+          if-no-files-found: warn
+          retention-days: 30
