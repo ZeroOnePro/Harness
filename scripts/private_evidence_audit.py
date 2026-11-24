@@ -144,7 +144,9 @@ def collect(repo, cutoff, directory):
                 entry["log"] = logname
                 entry["signature"] = fingerprint(raw)
                 if not entry["signature"]:
-                    limit("signature", EvidenceUnavailable("no_specific_error_signal"))
+                    entry["signature_status"] = "no_specific_error_signal"
+                else:
+                    entry["signature_status"] = "candidate_requires_review"
             except EvidenceUnavailable as exc:
                 limit("log", exc)
         if not row["jobs"]:
@@ -209,11 +211,17 @@ class Tests(unittest.TestCase):
                 self.assertEqual(list(Path(tmp).iterdir()), [])
 
     def test_evidence_and_missing_record(self):
+        self.check_collected_log(b"FileNotFoundError: fixture", True)
+
+    def test_collected_log_without_signature_is_not_partial(self):
+        self.check_collected_log(b"##[error]Process completed with exit code 1", False)
+
+    def check_collected_log(self, log, expected_signature):
         def fake(endpoint, pages=False, raw=False):
             if endpoint.endswith("/contents/.harness/failure-cases.jsonl"):
                 raise EvidenceUnavailable("http_404")
             if raw:
-                return b"FileNotFoundError: fixture"
+                return log
             if "/attempts/" in endpoint:
                 return [{"total_count": 1, "jobs": [{"id": 2, "conclusion": "failure", "steps": []}]}]
             if "/actions/runs?" in endpoint:
@@ -224,7 +232,10 @@ class Tests(unittest.TestCase):
                 result = collect("example/project", "2025-01-01", Path(tmp))
             self.assertEqual(result["status"], "complete")
             self.assertEqual(result["local_records"], "not_found_or_not_authorized")
-            self.assertTrue(result["runs"][0]["jobs"][0]["signature"])
+            job = result["runs"][0]["jobs"][0]
+            self.assertEqual(bool(job["signature"]), expected_signature)
+            self.assertEqual(job["signature_status"], "candidate_requires_review" if expected_signature else "no_specific_error_signal")
+            self.assertEqual(result["limitations"], [])
             self.assertEqual((Path(tmp) / "1-2.log").stat().st_mode & 0o777, 0o600)
 
 def main():
@@ -256,6 +267,9 @@ def main():
     summary = {"repositories": len(reports), "failed_runs": sum(len(r["runs"]) for r in reports),
                "failed_jobs_with_logs": sum("log" in j for r in reports for run in r["runs"] for j in run["jobs"]),
                "repeated_signatures": sum(n >= 2 for n in counts.values()),
+               "failed_jobs_with_signatures": sum(counts.values()),
+               "failed_jobs_without_signatures": sum("log" in j and not j.get("signature") for r in reports for run in r["runs"] for j in run["jobs"]),
+               "root_cause_status": "requires_private_review",
                "partial_repositories": sum(r["status"] != "complete" for r in reports),
                "missing_or_unavailable_failure_records": sum(r.get("local_records") != "collected" for r in reports)}
     write_private(root / "report.json", json.dumps({"summary": summary, "repositories": reports}, ensure_ascii=False, indent=2).encode())
@@ -263,6 +277,8 @@ def main():
     for index, report in enumerate(reports, 1):
         for entry in report["limitations"]:
             print(f'Repository {index}: {entry["stage"]}: {entry["reason"]}')
+    if summary["failed_jobs_without_signatures"]:
+        print("Some collected logs lack a specific error signature; review them privately. This is not a collection failure.")
     print("Private evidence directory:", root)
     print("Review source at recorded commit and reproduce failures before proposing generic evals. Never share the private directory.")
     return 2 if summary["partial_repositories"] else 0
