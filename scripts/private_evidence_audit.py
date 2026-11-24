@@ -19,7 +19,7 @@ REPO = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 # Match actual diagnostic records, not passing test names or process summaries.
 ERROR = re.compile(r"^(?:[A-Za-z_][\w.]*(?:Error|Exception):|(?:lua(?:\d+(?:\.\d+)?)?):\s|(?:FAIL|ERROR):\s+\S|[A-Za-z_][\w.$]*\s+>\s+.+\s+FAILED$|##\[error\]\s*(?!Process completed\b)\S)", re.I)
 TEMP = re.compile(r"(?<=/tmp/)tmp[\w-]+(?=/)")
-LOCATION = re.compile(r"(?<=\.[A-Za-z]{2}):\d+(?=:)")
+LOCATION = re.compile(r"(\.[A-Za-z][A-Za-z0-9]{0,9}):\d+(?=:)")
 STAMP = re.compile(r"^\d{4}-\d\d-\d\dT\S+\s+")
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
@@ -94,7 +94,7 @@ def fingerprint(log):
         line = STAMP.sub("", ANSI.sub("", raw)).strip()
         if not ERROR.search(line) or line.lower().startswith("##[error]process completed"):
             continue
-        line = LOCATION.sub(":<line>", TEMP.sub("<temporary>", line))
+        line = LOCATION.sub(r"\1:<line>", TEMP.sub("<temporary>", line))
         # Large assertion values may include entire generated files; keep a bounded diagnostic.
         line = line[:800]
         if re.match(r"^(?:FAIL|ERROR):\s", line):
