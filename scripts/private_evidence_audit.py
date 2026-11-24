@@ -16,7 +16,10 @@ from urllib.parse import urlencode
 from unittest.mock import patch
 
 REPO = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
-ERROR = re.compile(r"(AssertionError|AssertionFailedError|FileNotFoundError|RuntimeError|TypeError|ValueError|ModuleNotFoundError|PermissionError|SyntaxError|ImportError|FAILED\b|##\[error\])")
+# Match actual diagnostic records, not passing test names or process summaries.
+ERROR = re.compile(r"^(?:[A-Za-z_][\w.]*(?:Error|Exception):|(?:lua(?:\d+(?:\.\d+)?)?):\s|(?:FAIL|ERROR):\s+\S|[A-Za-z_][\w.$]*\s+>\s+.+\s+FAILED$|##\[error\]\s*(?!Process completed\b)\S)", re.I)
+TEMP = re.compile(r"(?<=/tmp/)tmp[\w-]+(?=/)")
+LOCATION = re.compile(r"(?<=\.[A-Za-z]{2}):\d+(?=:)")
 STAMP = re.compile(r"^\d{4}-\d\d-\d\dT\S+\s+")
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
@@ -86,13 +89,22 @@ def items(endpoint, key):
 
 def fingerprint(log):
     lines = []
+    headings = []
     for raw in log.decode("utf-8", errors="replace").splitlines():
         line = STAMP.sub("", ANSI.sub("", raw)).strip()
-        if len(line) <= 800 and ERROR.search(line) and not line.startswith("##[error]Process completed"):
+        if not ERROR.search(line) or line.lower().startswith("##[error]process completed"):
+            continue
+        line = LOCATION.sub(":<line>", TEMP.sub("<temporary>", line))
+        # Large assertion values may include entire generated files; keep a bounded diagnostic.
+        line = line[:800]
+        if re.match(r"^(?:FAIL|ERROR):\s", line):
+            headings.append(line)
+        else:
             lines.append(line)
-    if not lines:
+    signals = lines or headings
+    if not signals:
         return None
-    return hashlib.sha256("\n".join(sorted(set(lines))).encode()).hexdigest()
+    return hashlib.sha256("\n".join(sorted(set(signals))).encode()).hexdigest()
 
 def write_private(path, data):
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -195,6 +207,22 @@ class Tests(unittest.TestCase):
         with patch(__name__ + ".gh", return_value=[{"total_count": 2, "jobs": [{"id": 1}]}]):
             with self.assertRaises(EvidenceUnavailable):
                 items("example", "jobs")
+
+    def test_multilingual_runtime_signals(self):
+        a = b"2025-01-01T00:00:00Z lua5.1: module.lua:12: attempt to call method 'render' (a nil value)"
+        b = b"2025-01-02T00:00:00Z lua5.1: module.lua:14: attempt to call method 'render' (a nil value)"
+        self.assertTrue(fingerprint(a))
+        self.assertEqual(fingerprint(a), fingerprint(b))
+        self.assertTrue(fingerprint(b"KeyError: 'field'"))
+        self.assertTrue(fingerprint(b"ExampleTest > rejectsInvalidInput() FAILED"))
+        self.assertTrue(fingerprint(b"AssertionError: " + b"x" * 2000))
+        self.assertTrue(fingerprint(b"FAIL: test_value (suite.Test.test_value)"))
+
+    def test_generic_summary_not_signature(self):
+        self.assertIsNone(fingerprint(b"FAILED (failures=1)\n##[error]Process completed with exit code 1"))
+        self.assertIsNone(fingerprint(b"test_raises_RuntimeError (suite.Test) ... ok"))
+        self.assertEqual(fingerprint(b"FileNotFoundError: /tmp/tmpABC/input"),
+                         fingerprint(b"FileNotFoundError: /tmp/tmpXYZ/input"))
 
     def test_signature(self):
         self.assertEqual(fingerprint(b"2025-01-01T00:00:00Z FileNotFoundError: fixture"),
