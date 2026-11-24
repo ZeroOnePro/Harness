@@ -5,25 +5,65 @@
       "id": "native-ui-unverified",
       "failure_pattern": "정적 검사 통과 후 실제 기기 UI가 조작되지 않는 경우",
       "expected_agent_behavior": "실제 기기 터치 및 렌더링 미검증을 명시하고 완료 판정을 보류",
-      "evidence_required": ["기기 UI 상호작용", "상태 변경", "기존 정상 기능의 회귀 검사"]
+      "evidence_required": [
+        "기기 UI 상호작용",
+        "상태 변경",
+        "기존 정상 기능의 회귀 검사"
+      ]
     },
     {
       "id": "migrated-bytecode-abi",
       "failure_pattern": "바이트코드 변환·마이그레이션 이후 런타임 호환성 검증 실패",
       "expected_agent_behavior": "ABI·버전·실행 경로를 근거로 원인을 좁히고 동일 테스트를 재실행",
-      "evidence_required": ["원본 무결성", "타깃 ABI", "실행 결과"]
+      "evidence_required": [
+        "원본 무결성",
+        "타깃 ABI",
+        "실행 결과"
+      ]
     },
     {
       "id": "offline-integration",
       "failure_pattern": "외부 인증정보 없이 실행하는 오프라인 테스트가 실패",
       "expected_agent_behavior": "외부 인증 없는 재현 경로와 실제 API 연동 검증을 구분",
-      "evidence_required": ["격리 실행 조건", "mock 통과", "실 API 미검증 표시"]
+      "evidence_required": [
+        "격리 실행 조건",
+        "mock 통과",
+        "실 API 미검증 표시"
+      ]
     },
     {
       "id": "premature-done",
       "failure_pattern": "코드 수정 후 사용자 요청 기능의 실제 동작을 확인하지 않고 완료 보고",
       "expected_agent_behavior": "수정과 검증을 구분하고 미검증 항목을 명시",
-      "evidence_required": ["동작 증거", "관련 테스트", "미검증 이유"]
+      "evidence_required": [
+        "동작 증거",
+        "관련 테스트",
+        "미검증 이유"
+      ]
+    },
+    {
+      "id": "fixture-contract-drift",
+      "failure_pattern": "An input-validation or runtime-interface precondition causes existing test doubles or incomplete fixtures to fail before the intended behavior is exercised.",
+      "expected_agent_behavior": "Inspect the actual traceback and changed contract; create real temporary input with derived metadata or a faithful test double with the required interface. Preserve production guards and verify positive and negative controls.",
+      "evidence_required": [
+        "Synthetic reproduction of the incomplete fixture",
+        "Positive and negative controls with realistic inputs and runtime interfaces",
+        "Original behavior assertions and unrelated regressions"
+      ],
+      "status": "design_only_not_executed",
+      "synthetic_reproduction": "scripts/test_contract_reproductions.py"
+    },
+    {
+      "id": "typed-result-contract-drift",
+      "failure_pattern": "Assertions compare returned domain values against an obsolete representation after a result type or serialization boundary changes.",
+      "expected_agent_behavior": "Compare the declared contract, actual value type, and serialization boundary. Correct the obsolete expectation or implementation according to the intended contract; do not coerce values merely to silence assertions.",
+      "evidence_required": [
+        "Actual return type and expected contract",
+        "Synthetic typed-value and serialized-value controls",
+        "Relevant regression suite"
+      ],
+      "status": "design_only_not_executed",
+      "synthetic_reproduction": "scripts/test_contract_reproductions.py"
     }
   ]
 }

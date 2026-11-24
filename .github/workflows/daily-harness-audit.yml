@@ -17,6 +17,10 @@ jobs:
         run: |
           python3 -m py_compile scripts/*.py
           python3 -c "import json; d=json.load(open('evals/cases/observed_patterns.json', encoding='utf-8')); assert d['status']=='design_only_not_executed' and len(d['cases']) >= 3"
+      - name: Run collector self-tests and synthetic contract reproductions
+        run: |
+          python3 scripts/private_evidence_audit.py --self-test
+          python3 scripts/test_contract_reproductions.py
       - name: Validate nine archived originals, links and skill metadata
         run: python3 scripts/validate_harness.py --mode central --output harness-validation.json
       - name: Store central validation result
