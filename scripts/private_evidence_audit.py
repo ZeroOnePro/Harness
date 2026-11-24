@@ -26,7 +26,7 @@ class EvidenceUnavailable(Exception):
 def gh(endpoint, pages=False, raw=False):
     cmd = ["gh", "api", "--hostname", "github.com", endpoint]
     if pages:
-        cmd += ["--paginate", "--slurp"]
+        cmd += ["--paginate"]
     try:
         result = subprocess.run(cmd, capture_output=True, timeout=180, check=False)
     except (OSError, subprocess.TimeoutExpired):
@@ -34,13 +34,40 @@ def gh(endpoint, pages=False, raw=False):
     if result.returncode:
         # Do not echo stderr: it may include private identifiers.
         status = re.search(rb"HTTP (\d{3})", result.stderr)
-        raise EvidenceUnavailable("http_" + status.group(1).decode() if status else "request_failed")
+        if status:
+            reason = "http_" + status.group(1).decode()
+        elif b"unknown flag" in result.stderr.lower():
+            reason = "unsupported_cli_option"
+        elif b"gh auth login" in result.stderr.lower():
+            reason = "authentication_required"
+        else:
+            reason = "request_failed"
+        raise EvidenceUnavailable(reason)
     if raw:
         return result.stdout
     try:
+        if pages:
+            return decode_pages(result.stdout)
         return json.loads(result.stdout)
     except (ValueError, UnicodeError):
         raise EvidenceUnavailable("invalid_response") from None
+
+def decode_pages(data):
+    """Older gh versions emit consecutive JSON objects without an outer array."""
+    source = data.decode("utf-8")
+    decoder = json.JSONDecoder()
+    pages = []
+    index = 0
+    while index < len(source):
+        while index < len(source) and source[index].isspace():
+            index += 1
+        if index == len(source):
+            break
+        page, index = decoder.raw_decode(source, index)
+        if not isinstance(page, dict):
+            raise ValueError("expected JSON object page")
+        pages.append(page)
+    return pages
 
 def items(endpoint, key):
     pages = gh(endpoint, pages=True)
@@ -82,10 +109,14 @@ def collect(repo, cutoff, directory):
         meta = gh(prefix)
         if meta.get("private") is not True:
             raise EvidenceUnavailable("private_repository_required")
+    except EvidenceUnavailable as exc:
+        limit("repository", exc)
+        return result
+    try:
         query = urlencode({"status": "failure", "created": ">=" + cutoff, "per_page": 100})
         runs = items(prefix + "/actions/runs?" + query, "workflow_runs")
     except EvidenceUnavailable as exc:
-        limit("repository_or_runs", exc)
+        limit("runs", exc)
         return result
     for run in runs:
         row = {k: run.get(k) for k in ("id", "name", "event", "head_sha", "created_at", "run_attempt")}
@@ -137,6 +168,25 @@ def collect(repo, cutoff, directory):
     return result
 
 class Tests(unittest.TestCase):
+    def test_legacy_cli_pagination(self):
+        data = b'{"total_count":2,"jobs":[{"id":1}]}{"jobs":[{"id":2}]}\n'
+        completed = subprocess.CompletedProcess([], 0, stdout=data, stderr=b"")
+        with patch(__name__ + ".subprocess.run", return_value=completed) as execute:
+            self.assertEqual(len(items("/example", "jobs")), 2)
+            self.assertEqual(execute.call_args.args[0],
+                             ["gh", "api", "--hostname", "github.com", "/example", "--paginate"])
+
+    def test_cli_errors_are_safe(self):
+        for code, message, expected in [
+            (1, b"unknown flag: --example", "unsupported_cli_option"),
+            (1, b"HTTP 403 private detail", "http_403"),
+            (0, b"", "invalid_response"),
+        ]:
+            completed = subprocess.CompletedProcess([], code, stdout=b'{"jobs":', stderr=message)
+            with patch(__name__ + ".subprocess.run", return_value=completed):
+                with self.assertRaisesRegex(EvidenceUnavailable, "^" + expected + "$"):
+                    gh("/example", pages=True)
+
     def test_pagination(self):
         with patch(__name__ + ".gh", return_value=[{"total_count": 2, "jobs": [{"id": 1}]}, {"jobs": [{"id": 2}]}]):
             self.assertEqual(len(items("example", "jobs")), 2)
@@ -210,6 +260,9 @@ def main():
                "missing_or_unavailable_failure_records": sum(r.get("local_records") != "collected" for r in reports)}
     write_private(root / "report.json", json.dumps({"summary": summary, "repositories": reports}, ensure_ascii=False, indent=2).encode())
     print(json.dumps(summary))
+    for index, report in enumerate(reports, 1):
+        for entry in report["limitations"]:
+            print(f'Repository {index}: {entry["stage"]}: {entry["reason"]}')
     print("Private evidence directory:", root)
     print("Review source at recorded commit and reproduce failures before proposing generic evals. Never share the private directory.")
     return 2 if summary["partial_repositories"] else 0
