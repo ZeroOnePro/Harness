@@ -12,7 +12,9 @@ import re
 import subprocess
 import tempfile
 import unittest
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
+import urllib.request
+import urllib.error
 from unittest.mock import patch
 
 REPO = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
@@ -26,7 +28,48 @@ ANSI = re.compile(r"\x1b\[[0-9;]*m")
 class EvidenceUnavailable(Exception):
     pass
 
+class PrivateLogRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        target = urlsplit(newurl)
+        if target.scheme != "https" or not target.hostname or target.username or target.password:
+            raise EvidenceUnavailable("unsafe_log_redirect")
+        redirected = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if redirected is not None and target.netloc != "api.github.com":
+            redirected.remove_header("Authorization")
+        return redirected
+
+
+def scheduled_log(endpoint):
+    """Use the verified REST transport, not the runner's gh log transport."""
+    repo = os.environ.get("GITHUB_REPOSITORY", "")
+    token = os.environ.get("GH_TOKEN", "")
+    if not REPO.fullmatch(repo) or not token:
+        raise EvidenceUnavailable("scheduled_credentials_unavailable")
+    if not re.fullmatch(re.escape("/repos/" + repo + "/actions/jobs/") + r"\d+/logs", endpoint):
+        raise EvidenceUnavailable("scheduled_log_scope_violation")
+    request = urllib.request.Request("https://api.github.com" + endpoint, headers={
+        "Authorization": "Bearer " + token,
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "Harness-Private-Evidence",
+    })
+    try:
+        with urllib.request.build_opener(PrivateLogRedirect()).open(request, timeout=60) as response:
+            if response.status != 200:
+                raise EvidenceUnavailable("http_" + str(response.status))
+            data = response.read(64 * 1024 * 1024 + 1)
+            if len(data) > 64 * 1024 * 1024:
+                raise EvidenceUnavailable("log_size_limit")
+            return data
+    except urllib.error.HTTPError as exc:
+        raise EvidenceUnavailable("http_" + str(exc.code)) from None
+    except (urllib.error.URLError, OSError, ValueError):
+        raise EvidenceUnavailable("log_transport_failed") from None
+
+
 def gh(endpoint, pages=False, raw=False):
+    if raw and os.environ.get("GITHUB_ACTIONS") == "true":
+        return scheduled_log(endpoint)
     cmd = ["gh", "api", "--hostname", "github.com", endpoint]
     if pages:
         cmd += ["--paginate"]
@@ -182,6 +225,41 @@ def collect(repo, cutoff, directory):
     return result
 
 class Tests(unittest.TestCase):
+    def test_scheduled_rest_log_transport(self):
+        env = {"GITHUB_ACTIONS": "true", "GITHUB_REPOSITORY": "example/project", "GH_TOKEN": "synthetic"}
+        endpoint = "/repos/example/project/actions/jobs/42/logs"
+        with patch.dict(os.environ, env), patch(__name__ + ".urllib.request.build_opener") as factory, \
+                patch(__name__ + ".subprocess.run") as cli:
+            response = factory.return_value.open.return_value.__enter__.return_value
+            response.status = 200
+            response.read.return_value = b"synthetic log"
+            self.assertEqual(gh(endpoint, raw=True), b"synthetic log")
+            cli.assert_not_called()
+            request = factory.return_value.open.call_args.args[0]
+            self.assertEqual(request.full_url, "https://api.github.com" + endpoint)
+            self.assertEqual(request.get_header("Authorization"), "Bearer synthetic")
+            with self.assertRaisesRegex(EvidenceUnavailable, "scheduled_log_scope_violation"):
+                gh("/repos/other/project/actions/jobs/42/logs", raw=True)
+
+    def test_redirect_drops_credentials(self):
+        req = urllib.request.Request("https://api.github.com/example", headers={"Authorization": "Bearer synthetic"})
+        handler = PrivateLogRedirect()
+        cross = handler.redirect_request(req, None, 302, "Found", {}, "https://example.invalid/signed")
+        self.assertIsNone(cross.get_header("Authorization"))
+        same = handler.redirect_request(req, None, 302, "Found", {}, "https://api.github.com/next")
+        self.assertEqual(same.get_header("Authorization"), "Bearer synthetic")
+        for target in ("http://example.invalid/log", "https://user:pass@example.invalid/log"):
+            with self.assertRaisesRegex(EvidenceUnavailable, "unsafe_log_redirect"):
+                handler.redirect_request(req, None, 302, "Found", {}, target)
+
+    def test_scheduled_transport_reports_safe_http_error(self):
+        with patch.dict(os.environ, {"GITHUB_REPOSITORY": "example/project", "GH_TOKEN": "synthetic"}), \
+                patch(__name__ + ".urllib.request.build_opener") as factory:
+            factory.return_value.open.side_effect = urllib.error.HTTPError(
+                "https://example.invalid/private", 403, "secret detail", {}, None)
+            with self.assertRaisesRegex(EvidenceUnavailable, "^http_403$"):
+                scheduled_log("/repos/example/project/actions/jobs/42/logs")
+
     def test_legacy_cli_pagination(self):
         data = b'{"total_count":2,"jobs":[{"id":1}]}{"jobs":[{"id":2}]}\n'
         completed = subprocess.CompletedProcess([], 0, stdout=data, stderr=b"")
