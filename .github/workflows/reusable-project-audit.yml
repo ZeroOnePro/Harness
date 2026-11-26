@@ -22,11 +22,12 @@ jobs:
       - name: Validate project harness instructions
         run: python3 .harness-source/scripts/validate_harness.py --mode project --output harness-validation.json
       - name: Collect failed Actions step metadata in this private repo
+        if: github.event.repository.private == true && github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 .harness-source/scripts/harvest_failures.py --output harness-failures.json
-      - name: Keep detailed evidence inside calling repository
-        if: always()
+      - name: Keep metadata feedback inside calling repository
+        if: always() && github.event.repository.private == true
         uses: actions/upload-artifact@v4
         with:
           name: private-harness-feedback
@@ -35,3 +36,16 @@ jobs:
             harness-failures.json
           retention-days: 30
           if-no-files-found: warn
+      - name: Collect private scheduled failure evidence
+        if: github.event.repository.private == true && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .harness-source/scripts/scheduled_private_evidence.py
+      - name: Retain evidence inventory only in private repository
+        if: always() && github.event.repository.private == true && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-harness-evidence
+          path: ${{ runner.temp }}/harness-evidence.json
+          retention-days: 30
+          if-no-files-found: error
