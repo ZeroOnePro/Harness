@@ -21,6 +21,7 @@ jobs:
         run: |
           python3 scripts/private_evidence_audit.py --self-test
           python3 scripts/test_contract_reproductions.py
+          python3 scripts/scheduled_private_evidence.py --self-test
       - name: Validate nine archived originals, links and skill metadata
         run: python3 scripts/validate_harness.py --mode central --output harness-validation.json
       - name: Store central validation result
@@ -31,41 +32,3 @@ jobs:
           path: harness-validation.json
           if-no-files-found: warn
           retention-days: 30
-  triage:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v4
-      - name: Classify private failures without exposing repositories or logs
-        env:
-          HARNESS_SOURCE_READ_TOKEN: ${{ secrets.HARNESS_SOURCE_READ_TOKEN }}
-          HARNESS_PRIVATE_SOURCES: ${{ secrets.HARNESS_PRIVATE_SOURCES }}
-        run: python3 scripts/central_triage.py --output docs/CANDIDATE_IMPROVEMENTS.md
-      - name: Open review-only PR for generic proposals
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -z "$(git status --porcelain -- docs/CANDIDATE_IMPROVEMENTS.md)" ]; then
-            echo "No candidate changes"
-            exit 0
-          fi
-          title="[harness] Generic failure triage candidates"
-          if gh pr list --state open --json title --jq '.[].title' | grep -Fxq "$title"; then
-            echo "A triage PR already awaits review"
-            exit 0
-          fi
-          branch="automation/harness-triage-${GITHUB_RUN_ID}"
-          git checkout -b "$branch"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- docs/CANDIDATE_IMPROVEMENTS.md
-          git commit -m "docs: propose generic harness improvements"
-          git push origin "HEAD:$branch"
-          gh pr create --title "$title" \
-            --body "Privacy-filtered failure category proposals only. No source repo names or logs. Review and run actual agent evals before adopting." \
-            --head "$branch" --base main
